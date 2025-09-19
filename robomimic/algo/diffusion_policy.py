@@ -22,18 +22,25 @@ import robomimic.utils.obs_utils as ObsUtils
 from robomimic.algo import register_algo_factory_func, PolicyAlgo
 
 
-class _EMAModelWrapper:
-    """Compatibility wrapper around diffusers' EMAModel to expose an averaged model copy."""
+class _EMAModelAdapter:
+    """Compatibility wrapper exposing the legacy EMAModel interface across diffusers versions."""
 
     def __init__(self, model: nn.Module, power: float):
-        self._ema = DiffusersEMAModel(model.parameters(), power=power)
-        self.averaged_model = copy.deepcopy(model)
-        self.averaged_model.eval()
-        for param in self.averaged_model.parameters():
-            param.requires_grad_(False)
-        device = self._infer_device(model)
-        self.to(device)
-        self._sync_averaged_model(model)
+        self._using_parameter_api = False
+        try:
+            # diffusers<=0.34 uses the legacy API that accepts the model directly
+            self._ema = DiffusersEMAModel(model=model, power=power)
+            self.averaged_model = self._ema.averaged_model
+        except TypeError:
+            # diffusers>=0.35 removed the model argument and now accepts an iterable of parameters
+            self._using_parameter_api = True
+            self._ema = DiffusersEMAModel(model.parameters(), power=power)
+            self.averaged_model = copy.deepcopy(model)
+            self.averaged_model.eval()
+            for param in self.averaged_model.parameters():
+                param.requires_grad_(False)
+            self.to(self._infer_device(model))
+            self._sync_averaged_model(model)
 
     @staticmethod
     def _infer_device(model: nn.Module) -> torch.device:
@@ -53,34 +60,45 @@ class _EMAModelWrapper:
                 buffer.data.copy_(source_buffers[name].data)
 
     def _sync_averaged_model(self, model: nn.Module) -> None:
+        if not self._using_parameter_api:
+            return
         self._ema.copy_to(self.averaged_model.parameters())
         self._copy_buffers(model, self.averaged_model)
 
     def step(self, model: nn.Module) -> None:
-        self._ema.step(model.parameters())
-        self._sync_averaged_model(model)
+        if self._using_parameter_api:
+            self._ema.step(model.parameters())
+            self._sync_averaged_model(model)
+        else:
+            self._ema.step(model)
 
     def to(self, *args, **kwargs):
         self._ema.to(*args, **kwargs)
-        self.averaged_model.to(*args, **kwargs)
+        if self._using_parameter_api:
+            self.averaged_model.to(*args, **kwargs)
         return self
 
     def state_dict(self):
-        return {
-            "ema": self._ema.state_dict(),
-            "averaged_model": self.averaged_model.state_dict(),
-        }
+        if self._using_parameter_api:
+            return {
+                "ema": self._ema.state_dict(),
+                "averaged_model": self.averaged_model.state_dict(),
+            }
+        return self._ema.state_dict()
 
     def load_state_dict(self, state_dict):
         if state_dict is None:
             return
-        if isinstance(state_dict, dict) and "ema" in state_dict and "averaged_model" in state_dict:
-            self._ema.load_state_dict(state_dict["ema"])
-            self.averaged_model.load_state_dict(state_dict["averaged_model"])
+        if self._using_parameter_api:
+            if isinstance(state_dict, dict) and "ema" in state_dict and "averaged_model" in state_dict:
+                self._ema.load_state_dict(state_dict["ema"])
+                self.averaged_model.load_state_dict(state_dict["averaged_model"])
+            else:
+                self.averaged_model.load_state_dict(state_dict)
+                self._copy_shadow_params_from_averaged_model()
+            self._ema.copy_to(self.averaged_model.parameters())
         else:
-            self.averaged_model.load_state_dict(state_dict)
-            self._copy_shadow_params_from_averaged_model()
-        self._ema.copy_to(self.averaged_model.parameters())
+            self._ema.load_state_dict(state_dict)
 
     def _copy_shadow_params_from_averaged_model(self):
         averaged_params = list(self.averaged_model.parameters())
@@ -175,7 +193,7 @@ class DiffusionPolicyUNet(PolicyAlgo):
         # setup EMA
         ema = None
         if self.algo_config.ema.enabled:
-            ema = _EMAModelWrapper(model=nets, power=self.algo_config.ema.power)
+            ema = _EMAModelAdapter(model=nets, power=self.algo_config.ema.power)
                 
         # set attrs
         self.nets = nets
