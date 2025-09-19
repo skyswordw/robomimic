@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=67", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robomimic"
+version = "0.5.0"
+description = "robomimic: A Modular Framework for Robot Learning from Demonstration"
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Ajay Mandlekar", email = "amandlek@cs.stanford.edu" },
+    { name = "Danfei Xu" },
+    { name = "Josiah Wong" },
+    { name = "Soroush Nasiriany" },
+    { name = "Chen Wang" },
+    { name = "Matthew Bronars" },
+    { name = "Vaibhav Saxena" },
+]
+dependencies = [
+    "numpy>=1.13.3",
+    "h5py",
+    "psutil",
+    "tqdm",
+    "termcolor",
+    "tensorboard",
+    "tensorboardX",
+    "imageio",
+    "imageio-ffmpeg",
+    "matplotlib",
+    "egl_probe>=1.0.1",
+    "torch",
+    "torchvision",
+    "huggingface_hub==0.23.4",
+    "transformers==4.41.2",
+    "diffusers>=0.35.1",
+]
+
+[project.optional-dependencies]
+docs = [
+    "sphinx_book_theme==0.3.3",
+    "sphinx_markdown_tables==0.0.15",
+    "recommonmark==0.7.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/ARISE-Initiative/robomimic"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["robomimic*"]
+
+[tool.setuptools.package-data]
+"robomimic" = ["**/*"]
+
+[tool.uv]
+package = true

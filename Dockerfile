@@ -32,23 +32,26 @@ RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_6
 # Create and activate robomimic conda environment with Python 3.9
 RUN /opt/conda/bin/conda create -n robomimic_venv python=3.9 -y
 
+# Install uv in the robomimic environment
+RUN /opt/conda/bin/conda run -n robomimic_venv python -m pip install --upgrade pip uv
+
 # Install PyTorch and torchvision with CPU fallback
 RUN /opt/conda/bin/conda run -n robomimic_venv conda install -y pytorch==2.0.0 torchvision==0.15.0 cpuonly -c pytorch || \
-    /opt/conda/bin/conda run -n robomimic_venv pip install torch==2.0.0+cpu torchvision==0.15.0+cpu
+    /opt/conda/bin/conda run -n robomimic_venv uv pip install --extra-index-url https://download.pytorch.org/whl/cpu torch==2.0.0+cpu torchvision==0.15.0+cpu
 
 # Install robomimic from source
 WORKDIR /opt
 RUN git clone https://github.com/ARISE-Initiative/robomimic.git && \
-    /opt/conda/bin/conda run -n robomimic_venv pip install -e ./robomimic
+    /opt/conda/bin/conda run -n robomimic_venv uv pip install -e ./robomimic
 
 # Install robosuite
 RUN git clone https://github.com/ARISE-Initiative/robosuite.git && \
     cd robosuite && \
-    /opt/conda/bin/conda run -n robomimic_venv pip install -r requirements.txt
+    /opt/conda/bin/conda run -n robomimic_venv uv pip install -r requirements.txt
 
 # Optional: Install robomimic documentation dependencies
 WORKDIR /opt/robomimic
-RUN /opt/conda/bin/conda run -n robomimic_venv pip install -r requirements-docs.txt
+RUN /opt/conda/bin/conda run -n robomimic_venv uv pip install '.[docs]'
 
 # Set the working directory
 WORKDIR /workspace
