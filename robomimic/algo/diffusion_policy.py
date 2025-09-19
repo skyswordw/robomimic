@@ -2,17 +2,16 @@
 Implementation of Diffusion Policy https://diffusion-policy.cs.columbia.edu/ by Cheng Chi
 """
 from typing import Callable, Union
+import copy
 import math
 from collections import OrderedDict, deque
 from packaging.version import parse as parse_version
-import random
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-# requires diffusers==0.11.1
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
-from diffusers.training_utils import EMAModel
+from diffusers.training_utils import EMAModel as DiffusersEMAModel
 
 import robomimic.models.obs_nets as ObsNets
 import robomimic.models.diffusion_policy_nets as DPNets
@@ -22,10 +21,76 @@ import robomimic.utils.obs_utils as ObsUtils
 
 from robomimic.algo import register_algo_factory_func, PolicyAlgo
 
-import random
-import robomimic.utils.torch_utils as TorchUtils
-import robomimic.utils.tensor_utils as TensorUtils
-import robomimic.utils.obs_utils as ObsUtils
+
+class _EMAModelWrapper:
+    """Compatibility wrapper around diffusers' EMAModel to expose an averaged model copy."""
+
+    def __init__(self, model: nn.Module, power: float):
+        self._ema = DiffusersEMAModel(model.parameters(), power=power)
+        self.averaged_model = copy.deepcopy(model)
+        self.averaged_model.eval()
+        for param in self.averaged_model.parameters():
+            param.requires_grad_(False)
+        device = self._infer_device(model)
+        self.to(device)
+        self._sync_averaged_model(model)
+
+    @staticmethod
+    def _infer_device(model: nn.Module) -> torch.device:
+        try:
+            return next(model.parameters()).device
+        except StopIteration:
+            buffers = list(model.buffers())
+            if len(buffers) > 0:
+                return buffers[0].device
+        return torch.device("cpu")
+
+    @staticmethod
+    def _copy_buffers(source: nn.Module, target: nn.Module) -> None:
+        source_buffers = dict(source.named_buffers())
+        for name, buffer in target.named_buffers():
+            if name in source_buffers:
+                buffer.data.copy_(source_buffers[name].data)
+
+    def _sync_averaged_model(self, model: nn.Module) -> None:
+        self._ema.copy_to(self.averaged_model.parameters())
+        self._copy_buffers(model, self.averaged_model)
+
+    def step(self, model: nn.Module) -> None:
+        self._ema.step(model.parameters())
+        self._sync_averaged_model(model)
+
+    def to(self, *args, **kwargs):
+        self._ema.to(*args, **kwargs)
+        self.averaged_model.to(*args, **kwargs)
+        return self
+
+    def state_dict(self):
+        return {
+            "ema": self._ema.state_dict(),
+            "averaged_model": self.averaged_model.state_dict(),
+        }
+
+    def load_state_dict(self, state_dict):
+        if state_dict is None:
+            return
+        if isinstance(state_dict, dict) and "ema" in state_dict and "averaged_model" in state_dict:
+            self._ema.load_state_dict(state_dict["ema"])
+            self.averaged_model.load_state_dict(state_dict["averaged_model"])
+        else:
+            self.averaged_model.load_state_dict(state_dict)
+            self._copy_shadow_params_from_averaged_model()
+        self._ema.copy_to(self.averaged_model.parameters())
+
+    def _copy_shadow_params_from_averaged_model(self):
+        averaged_params = list(self.averaged_model.parameters())
+        shadow_params = getattr(self._ema, "shadow_params", None)
+        if shadow_params is None:
+            return
+        if len(shadow_params) != len(averaged_params):
+            return
+        for ema_param, averaged_param in zip(shadow_params, averaged_params):
+            ema_param.data.copy_(averaged_param.data)
 
 
 @register_algo_factory_func("diffusion_policy")
@@ -110,7 +175,7 @@ class DiffusionPolicyUNet(PolicyAlgo):
         # setup EMA
         ema = None
         if self.algo_config.ema.enabled:
-            ema = EMAModel(model=nets, power=self.algo_config.ema.power)
+            ema = _EMAModelWrapper(model=nets, power=self.algo_config.ema.power)
                 
         # set attrs
         self.nets = nets
@@ -375,7 +440,7 @@ class DiffusionPolicyUNet(PolicyAlgo):
             "nets": self.nets.state_dict(),
             "optimizers": { k : self.optimizers[k].state_dict() for k in self.optimizers },
             "lr_schedulers": { k : self.lr_schedulers[k].state_dict() if self.lr_schedulers[k] is not None else None for k in self.lr_schedulers },
-            "ema": self.ema.averaged_model.state_dict() if self.ema is not None else None,
+            "ema": self.ema.state_dict() if self.ema is not None else None,
         }
 
     def deserialize(self, model_dict, load_optimizers=False):
@@ -396,8 +461,8 @@ class DiffusionPolicyUNet(PolicyAlgo):
         if "lr_schedulers" not in model_dict:
             model_dict["lr_schedulers"] = {}
 
-        if model_dict.get("ema", None) is not None:
-            self.ema.averaged_model.load_state_dict(model_dict["ema"])
+        if self.ema is not None and model_dict.get("ema", None) is not None:
+            self.ema.load_state_dict(model_dict["ema"])
 
         if load_optimizers:
             for k in model_dict["optimizers"]:
