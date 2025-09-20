@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robomimic"
+version = "0.5.0"
+description = "robomimic: A Modular Framework for Robot Learning from Demonstration"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9,<3.13"
+authors = [
+  { name = "Ajay Mandlekar" },
+  { name = "Danfei Xu" },
+  { name = "Josiah Wong" },
+  { name = "Soroush Nasiriany" },
+  { name = "Chen Wang" },
+  { name = "Matthew Bronars" },
+  { name = "Vaibhav Saxena" }
+]
+dependencies = [
+  "numpy>=1.13.3",
+  "h5py",
+  "psutil",
+  "tqdm",
+  "termcolor",
+  "tensorboard",
+  "tensorboardX",
+  "imageio",
+  "imageio-ffmpeg",
+  "matplotlib",
+  "egl_probe>=1.0.1",
+  "torch",
+  "torchvision",
+  "huggingface_hub>=0.34.0",
+  "transformers==4.41.2",
+  "diffusers>=0.35.1",
+  "cmake>=3.27",
+]
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Operating System :: OS Independent"
+]
+
+[project.urls]
+Homepage = "https://github.com/ARISE-Initiative/robomimic"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["robomimic*"]
+
+[project.optional-dependencies]
+robomimic = [
+    "robosuite @ git+https://github.com/ARISE-Initiative/robosuite.git",
+]

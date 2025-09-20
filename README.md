@@ -15,7 +15,7 @@
 
 -------
 ## Latest Updates
-- [06/20/2025] **v0.5.0**: Diffusion Policy, multi-dataset training, language-conditioned policies, and more! 
+- [06/20/2025] **v0.5.0**: Diffusion Policy, multi-dataset training, language-conditioned policies, and more!
 - [03/11/2025] **v0.4.0**: support for [robosuite v1.5](https://github.com/ARISE-Initiative/robosuite/tree/v1.5.1) and migrate robomimic datasets to HuggingFace
 - [10/11/2023] **v0.3.1**: support for extracting, training on, and visualizing depth observations for robosuite datasets
 - [07/03/2023] **v0.3.0**: BC-Transformer and IQL :brain:, support for DeepMind MuJoCo bindings :robot:, pre-trained image reps :eye:, wandb logging :chart_with_upwards_trend:, and more
@@ -67,9 +67,25 @@ It offers a broad set of demonstration datasets collected on robot manipulation 
 
 The robomimic framework also makes reproducing the results from different benchmarks and datasets easy. See the [datasets page](https://robomimic.github.io/docs/datasets/overview.html) for more information on downloading datasets and reproducing experiments.
 
+## Installation
+
+robomimic uses [uv](https://docs.astral.sh/uv/) for dependency management. Ensure Python 3.12 or newer is available and then install the project and extras as needed:
+
+```sh
+uv pip install -e .
+```
+
+If a system CMake is not available, `uv` will install a Python-provided build thanks to the bundled `cmake` dependency.
+
+Documentation requirements can be installed via:
+
+```sh
+uv pip install -r requirements-docs.txt
+```
+
 ## Docker
 
-You can use the `Dockerfile` to easily build a containerized environment for setting up robomimic with Python 3.9, Miniconda, robosuite, and PyTorch (CPU/GPU support).
+You can use the `Dockerfile` to easily build a containerized environment for setting up robomimic with Python 3.12, Miniconda, uv, robosuite, and PyTorch (CPU/GPU support).
 
 To build, run:
 `docker build -t robomimic .`
@@ -103,3 +119,14 @@ Please cite [this paper](https://arxiv.org/abs/2108.03298) if you use this frame
   year={2021}
 }
 ```
+
+
+# caution
+## for training diffusion policy on headless server
+
+```bash
+XDG_RUNTIME_DIR=/tmp/xdg MUJOCO_GL=egl PYOPENGL_PLATFORM=egl MUJOCO_EGL_DEVICE_ID=0 uv run python robomimic/scripts/train.py --config robomimic/exps/templates/diffusion_policy.json --dataset datasets/lift/ph/low_dim_v15.hdf5
+```
+
+and its better to adjust the video resolution to 224x224, otherwise it may crash because of the non-stable rendering.
+The specific code location is `env.render(mode="rgb_array", height=512, width=512)`.
