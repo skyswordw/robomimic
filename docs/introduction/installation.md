@@ -3,9 +3,12 @@
 ## Requirements
 
 - Mac OS X or Linux machine
-- Python >= 3.6 (recommended 3.8.0)
+- Python >= 3.12
 - [conda](https://www.anaconda.com/products/individual) 
   - [virtualenv](https://virtualenv.pypa.io/en/latest/) is also an acceptable alternative, but we assume you have conda installed in our examples below
+- [uv](https://docs.astral.sh/uv/) (dependency and environment management used in this project)
+- [CMake](https://cmake.org/download/) (required for building `egl-probe`; `uv` will install a Python-provided build if a system binary is unavailable)
+
 
 ## Install robomimic
 
@@ -13,7 +16,7 @@
 <p class="admonition-title">1. Create and activate conda environment</p>
 
 ```sh
-$ conda create -n robomimic_venv python=3.8.0
+$ conda create -n robomimic_venv python=3.12
 $ conda activate robomimic_venv
 ```
 
@@ -63,7 +66,7 @@ $ conda install pytorch==2.0.0 torchvision==0.15.1 -c pytorch
 $ cd <PATH_TO_YOUR_INSTALL_DIRECTORY>
 $ git clone https://github.com/ARISE-Initiative/robomimic.git
 $ cd robomimic
-$ pip install -e .
+$ uv pip install -e .
 ```
 
 </p>
@@ -74,7 +77,7 @@ $ pip install -e .
 <p>
 
 ```sh
-$ pip install robomimic
+$ uv pip install robomimic
 ```
 
 </p>
@@ -109,10 +112,10 @@ If you would like to run robomimic examples and work with released datasets, ple
 $ cd <PATH_TO_INSTALL_DIR>
 $ git clone https://github.com/ARISE-Initiative/robosuite.git
 $ cd robosuite
-$ pip install -r requirements.txt
+$ uv pip install -r requirements.txt
 OR
 # Via pip
-$ pip install robosuite
+$ uv pip install robosuite
 ```
 
 **(Optional)** to use our released datasets and reproduce our experiments, switch to the `v1.5.1` branch (requires installing robosuite from source):
@@ -126,7 +129,7 @@ git checkout v1.5.1
 
 Robosuite requires [mujoco-py](https://github.com/openai/mujoco-py). If you are on an Ubuntu machine with a GPU, you should make sure that the `GPU` version of `mujoco-py` gets built, so that image rendering is fast (crucial for working with image datasets!).
 
-An easy way to ensure this is to clone the repository, change [this line](https://github.com/openai/mujoco-py/blob/4830435a169c1f3e3b5f9b58a7c3d9c39bdf4acb/mujoco_py/builder.py#L74) to `Builder = LinuxGPUExtensionBuilder`, and install from source by running `pip install -e .` in the `mujoco-py` root directory.
+An easy way to ensure this is to clone the repository, change [this line](https://github.com/openai/mujoco-py/blob/4830435a169c1f3e3b5f9b58a7c3d9c39bdf4acb/mujoco_py/builder.py#L74) to `Builder = LinuxGPUExtensionBuilder`, and install from source by running `uv pip install -e .` in the `mujoco-py` root directory.
 
 </div> -->
 
@@ -168,7 +171,7 @@ To run some easy examples, see the [Getting Started](./getting_started.html) sec
 If you plan to contribute to the repository and add new features, you must install the additional requirements required to build the documentation locally:
 
 ```sh
-$ pip install -r requirements-docs.txt
+$ uv pip install -r requirements-docs.txt
 ```
 
 You can test generating the documentation and viewing it locally in a web browser:
