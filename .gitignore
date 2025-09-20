@@ -124,6 +124,3 @@ macros_private.py
 
 # data
 datasets/
-
-# uv
-uv.lock
